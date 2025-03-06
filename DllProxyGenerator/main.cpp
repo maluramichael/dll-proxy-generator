@@ -237,24 +237,52 @@ void generateMainCPP(const string& dllName, const vector<string>& functionNames)
     file << "} " << dllName << ";\n\n";
 
     // Generate exports based on architecture
+    file << "extern \"C\"\n{\n";
+
     if (g_architectureType == IMAGE_FILE_MACHINE_AMD64)
     {
-        file << "extern \"C\"\n{\n";
+        // 64-bit implementation using RunASM
+        file << "\tFARPROC PA = 0;\n"
+             << "\tint RunASM();\n\n";
+
         for (const auto& functionName : functionNames)
         {
-            file << "\tvoid Fake" << functionName << "() { _asm { jmp[" << dllName << ".Orignal" << functionName << "] } }\n";
+            file << "\tvoid Fake" << functionName << "() { PA = " << dllName << ".Orignal" << functionName << "; RunASM(); }\n";
         }
-        file << "}\n";
+    }
+    else if (g_architectureType == IMAGE_FILE_MACHINE_I386)
+    {
+        // 32-bit implementation using inline assembly
+        for (const auto& functionName : functionNames)
+        {
+            file << "\t__declspec(naked) void Fake" << functionName << "()\n"
+                 << "\t{\n"
+                 << "\t\t__asm\n"
+                 << "\t\t{\n"
+                 << "\t\t\tpush ebp\n"
+                 << "\t\t\tmov ebp, esp\n"
+                 << "\t\t\tjmp dword ptr [" << dllName << ".Orignal" << functionName << "]\n"
+                 << "\t\t}\n"
+                 << "\t}\n";
+        }
     }
     else
     {
-        for (const auto& functionName : functionNames)
-        {
-            file << "__declspec(naked) void Fake" << functionName << "() { _asm { jmp[" << dllName << ".Orignal" << functionName << "] } }\n";
-        }
+        throw runtime_error("Unsupported architecture type");
     }
 
-    file << "\nBOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {\n"
+    file << "}\n\n";
+
+    // Generate setup function
+    file << "void setupFunctions() {\n";
+    for (const auto& functionName : functionNames)
+    {
+        file << "\t" << dllName << ".Orignal" << functionName << " = GetProcAddress(" << dllName << ".dll, \"" << functionName << "\");\n";
+    }
+    file << "}\n\n";
+
+    // Generate DllMain
+    file << "BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {\n"
          << "\tchar path[MAX_PATH];\n"
          << "\tswitch (ul_reason_for_call)\n"
          << "\t{\n"
@@ -266,14 +294,9 @@ void generateMainCPP(const string& dllName, const vector<string>& functionNames)
          << "\t\t{\n"
          << "\t\t\tMessageBox(0, \"Cannot load original " << dllName << ".dll library\", \"Proxy\", MB_ICONERROR);\n"
          << "\t\t\tExitProcess(0);\n"
-         << "\t\t}\n";
-
-    for (const auto& functionName : functionNames)
-    {
-        file << "\t\t" << dllName << ".Orignal" << functionName << " = GetProcAddress(" << dllName << ".dll, \"" << functionName << "\");\n";
-    }
-
-    file << "\n\t\tbreak;\n"
+         << "\t\t}\n"
+         << "\t\tsetupFunctions();\n"
+         << "\t\tbreak;\n"
          << "\t}\n"
          << "\tcase DLL_PROCESS_DETACH:\n"
          << "\t{\n"
@@ -291,6 +314,12 @@ void generateMainCPP(const string& dllName, const vector<string>& functionNames)
  */
 void generateASM(const string& dllName)
 {
+    // Only generate ASM file for 64-bit
+    if (g_architectureType != IMAGE_FILE_MACHINE_AMD64)
+    {
+        return;
+    }
+
     ofstream file(dllName + ".asm");
     if (!file.is_open())
     {
@@ -301,7 +330,7 @@ void generateASM(const string& dllName)
          << "extern PA : qword\n"
          << ".code\n"
          << "RunASM proc\n"
-         << "jmp qword ptr [PA]\n"
+         << "    jmp qword ptr [PA]\n"
          << "RunASM endp\n"
          << "end\n";
 }
@@ -331,6 +360,13 @@ int main(int argc, char* argv[])
         }
 
         g_architectureType = headers.FileHeader.Machine;
+        
+        // Check for supported architectures
+        if (g_architectureType != IMAGE_FILE_MACHINE_AMD64 && g_architectureType != IMAGE_FILE_MACHINE_I386)
+        {
+            cerr << "Error: Unsupported architecture type" << endl;
+            return 1;
+        }
 
         // Extract DLL name without extension
         vector<string> pathComponents = splitString(dllPath, '\\');
@@ -347,9 +383,16 @@ int main(int argc, char* argv[])
         // Generate files
         generateDEF(dllName, g_exportedNames);
         generateMainCPP(dllName, g_exportedNames);
-        generateASM(dllName);
+        
+        // Only generate ASM file for 64-bit
+        if (g_architectureType == IMAGE_FILE_MACHINE_AMD64)
+        {
+            generateASM(dllName);
+        }
 
         cout << "Successfully generated proxy DLL files for: " << dllName << endl;
+        cout << "Architecture: " << (g_architectureType == IMAGE_FILE_MACHINE_AMD64 ? "64-bit" : "32-bit") << endl;
+        cout << "Number of exported functions: " << g_exportedNames.size() << endl;
         return 0;
     }
     catch (const exception& e)
