@@ -1,34 +1,34 @@
-# Dll Proxy Generator
+# DLL Proxy Generator
 
-This project creates a new dll which sits between a game and the original dll. This way you can intercept all dll calls.
+This project creates a new DLL that acts as an intermediary between a game and the original DLL, allowing you to intercept all DLL calls.
 
-Game -> Your proxy dll -> Original dll
+Game → Your proxy DLL → Original DLL
 
-Original by Kristoffer Blasiak (<https://www.codeproject.com/Articles/1179147/ProxiFy-Automatic-Proxy-DLL-Generation>) i modified his project so the output fits my needs.
+Originally created by Kristoffer Blasiak ([ProxiFy - Automatic Proxy DLL Generation](https://www.codeproject.com/Articles/1179147/ProxiFy-Automatic-Proxy-DLL-Generation)), this project has been modified to better suit specific needs.
 
-## Build
+## Building
 
-Open DllProxyGenerator.sln with Visual Studio and build it
+Open `DllProxyGenerator.sln` with Visual Studio and build the solution.
 
 ## Usage
 
-### Generate the proxy dll source
+### Generate the Proxy DLL Source
 
+```bash
 .\DllProxyGenerator.exe "path\to\your\dll"
+```
 
-Be careful which dlls you try to proxy. I tried public windows dlls like d3d9 or user32 which work great. Game specific dlls with mangled function names wont work. Except someone knows how to counter this problem.
+> **Note**: Be careful when selecting DLLs to proxy. Public Windows DLLs like `d3d9` or `user32` work well, but game-specific DLLs with mangled function names may not work. This limitation may be addressed in future updates.
 
-### Build the proxy dll
+### Building the Proxy DLL
 
-Create a new Visual Studio dll project. Copy the generated proxy files into your project.
+1. Create a new Visual Studio DLL project
+2. Copy the generated proxy files into your project
+3. Remove all other files (like `stdafx.h`)
+4. Update the following project settings:
+   - General > Project Defaults > Character Set = Use Multi-Byte Character Set
+   - C/C++ > Precompiled Headers > Precompiled Header = Not Using Precompiled Headers
 
-Remove every other file like stdafx.h
+### Using the New DLL
 
-Change the following settings.
-
-* General > Project Defaults > Character Set = Use Multi-Byte Character Set
-* C/C++ > Precompiled Headers > Precompiled Header = Not Using Precompiled Headers
-
-### Use the new dll
-
-Copy your new proxy inside the game directory. Some games have a different load mechanism. Depending on which dll you generated it could be possible that the game does not load your dll first in which case the proxy doesn't work.
+Copy your new proxy DLL into the game directory. Note that some games may have different DLL loading mechanisms. Depending on which DLL you generated, the game might not load your proxy DLL first, in which case the proxy won't work.
