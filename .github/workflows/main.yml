@@ -17,7 +17,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v1.0.2
@@ -28,8 +28,22 @@ jobs:
       # See https://docs.microsoft.com/visualstudio/msbuild/msbuild-command-line-reference
       run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} ${{env.SOLUTION_FILE_PATH}}
       
-    - name: Upload artifact
-      uses: actions/upload-artifact@v2
+    - name: Upload executable artifact
+      uses: actions/upload-artifact@v4
       with:
-        name: Artifact
+        name: DllProxyGenerator
         path: D:\a\dll-proxy-generator\dll-proxy-generator\x64\Release\DllProxyGenerator.exe
+        compression-level: 9
+        retention-days: 5
+        if-no-files-found: error
+
+    - name: Upload debug symbols
+      uses: actions/upload-artifact@v4
+      with:
+        name: Debug-Symbols
+        path: |
+          D:\a\dll-proxy-generator\dll-proxy-generator\x64\Release\*.pdb
+          D:\a\dll-proxy-generator\dll-proxy-generator\x64\Release\*.map
+        compression-level: 9
+        retention-days: 5
+        if-no-files-found: warn
