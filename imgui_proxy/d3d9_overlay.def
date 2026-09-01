@@ -1,0 +1,3 @@
+EXPORTS
+    Direct3DCreate9
+    Direct3DCreate9Ex

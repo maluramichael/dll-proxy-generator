@@ -395,3 +395,12 @@ ASALocalRun/
 
 
 # End of https://www.gitignore.io/api/c++,windows,visualstudio
+# --- proxy demo (added for d3d9/WoW ImGui overlay work) ---
+# Third-party clones (Dear ImGui, MinHook) are pulled locally, not vendored.
+third_party/
+# CMake build trees
+build/
+imgui_proxy/build/
+# Throwaway generator smoke-test outputs
+proxy_build/
+forward_only/

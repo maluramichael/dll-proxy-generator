@@ -130,6 +130,22 @@ static bool readExports(const string &dllPath, vector<Export> &out)
 
 // --- forward mode ------------------------------------------------------------
 
+// Escape a string so it is safe to embed inside a C++ string literal. Mainly
+// matters for realModule paths like C:\Windows\System32\d3d9: a bare backslash
+// forms an invalid escape (\W, \S, \d) that MSVC drops, which would mangle the
+// forwarder target. Double the backslashes so the emitted literal is correct.
+static string cppLiteral(const string &s)
+{
+    string out;
+    for (char c : s)
+    {
+        if (c == '\\' || c == '"')
+            out += '\\';
+        out += c;
+    }
+    return out;
+}
+
 static bool isOverridden(const string &name, const vector<string> &overrides)
 {
     for (const auto &o : overrides)
@@ -164,7 +180,7 @@ static void writeForwardProxy(const string &stem, const string &realModule,
         }
         if (!e.name.empty())
         {
-            f << "#pragma comment(linker, \"/export:" << e.name << "=" << realModule << "." << e.name << "\")\n";
+            f << "#pragma comment(linker, \"/export:" << e.name << "=" << cppLiteral(realModule) << "." << e.name << "\")\n";
             forwarded++;
         }
         else
