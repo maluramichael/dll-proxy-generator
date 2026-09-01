@@ -8,27 +8,45 @@ Original by Kristoffer Blasiak (<https://www.codeproject.com/Articles/1179147/Pr
 
 ## Build
 
-Open DllProxyGenerator.sln with Visual Studio and build it
+Open DllProxyGenerator.sln with Visual Studio and build it.
 
 ## Usage
 
-### Generate the proxy dll source
+The generator reads the export table of a DLL and writes proxy source. Two modes:
 
-.\DllProxyGenerator.exe "path\to\your\dll"
+### forward (default)
 
-Be careful which dlls you try to proxy. I tried public windows dlls like d3d9 or user32 which work great. Game specific dlls with mangled function names wont work. Except someone knows how to counter this problem.
+Writes `<stem>_proxy.cpp` (all exports forwarded to the real DLL via linker
+`/export` pragmas) plus a ready-to-build `CMakeLists.txt`. You override only the
+function you want to intercept; everything else passes through untouched. Works
+for x86 and x64. This is the right shape for hooking a graphics DLL and drawing
+an overlay.
 
-### Build the proxy dll
+```
+DllProxyGenerator d3d9.dll --real C:\Windows\System32\d3d9 --override Direct3DCreate9,Direct3DCreate9Ex
+DllProxyGenerator SDL2.dll --real SDL2_orig --override SDL_GL_SwapWindow
+```
 
-Create a new Visual Studio dll project. Copy the generated proxy files into your project.
+`--real` is the forward target: a bare module name of a renamed copy next to the
+proxy (`SDL2_orig`), or an absolute path without extension so the forward never
+resolves back to the proxy itself (`C:\Windows\System32\d3d9`).
 
-Remove every other file like stdafx.h
+### trampoline (legacy)
 
-Change the following settings.
+`--trampoline` writes the old `.def` + `.cpp` naked-jmp stubs, one per export, so
+you can put C code in front of every export. MSVC and x86 only (inline `__asm`
+has no x64 equivalent); use `--forward` for a 64-bit proxy.
 
-* General > Project Defaults > Character Set = Use Multi-Byte Character Set
-* C/C++ > Precompiled Headers > Precompiled Header = Not Using Precompiled Headers
+### Build the proxy
 
-### Use the new dll
+```
+cmake -A Win32 -B build   # x86 target process (e.g. WoW 3.3.5a)
+cmake -A x64   -B build   # x64 target process (e.g. WRATH)
+cmake --build build --config Release
+```
 
-Copy your new proxy inside the game directory. Some games have a different load mechanism. Depending on which dll you generated it could be possible that the game does not load your dll first in which case the proxy doesn't work.
+Copy the built proxy DLL into the game directory. The Windows DLL search order
+loads the application directory before system32, so the proxy wins.
+
+See `HANDOVER.md` for two worked ImGui-overlay examples (WoW 3.3.5a via d3d9,
+WRATH via SDL2).
