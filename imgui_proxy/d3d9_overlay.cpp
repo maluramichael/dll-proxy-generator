@@ -13,6 +13,19 @@
 #include <windows.h>
 #include <d3d9.h>
 
+#ifdef PROXY_DEBUG
+#include <cstdio>
+static void LogLine(const char *msg)
+{
+    FILE *f = nullptr;
+    fopen_s(&f, "C:\\Users\\Michael\\d3d9proxy.log", "a");
+    if (f) { fprintf(f, "%lu %s\n", GetTickCount(), msg); fclose(f); }
+    OutputDebugStringA(msg);
+}
+#else
+static inline void LogLine(const char *) {}
+#endif
+
 #include "MinHook.h"
 #include "imgui.h"
 #include "backends/imgui_impl_dx9.h"
@@ -72,6 +85,7 @@ static HRESULT STDMETHODCALLTYPE hkEndScene(IDirect3DDevice9 *dev)
 {
     if (!gImGuiReady)
     {
+        LogLine("hkEndScene first");
         D3DDEVICE_CREATION_PARAMETERS cp;
         if (SUCCEEDED(dev->GetCreationParameters(&cp)))
             gWindow = cp.hFocusWindow;
@@ -140,6 +154,9 @@ static void HookDeviceVTable()
     HRESULT hr = d3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, tmp,
                                    D3DCREATE_SOFTWARE_VERTEXPROCESSING | D3DCREATE_DISABLE_DRIVER_MANAGEMENT,
                                    &pp, &dev);
+#ifdef PROXY_DEBUG
+    { char b[64]; sprintf_s(b, "CreateDevice hr=0x%08lX", (unsigned long)hr); LogLine(b); }
+#endif
     if (FAILED(hr) || !dev)
     {
         d3d->Release();
@@ -160,6 +177,7 @@ static void HookDeviceVTable()
     MH_CreateHook(vtable[42], &hkEndScene, reinterpret_cast<void **>(&oEndScene)); // EndScene
     MH_CreateHook(vtable[16], &hkReset, reinterpret_cast<void **>(&oReset));       // Reset
     MH_EnableHook(MH_ALL_HOOKS);
+    LogLine("vtable hooked");
     gVTableHooked = true;
 
     dev->Release();
@@ -174,6 +192,7 @@ static void HookDeviceVTable()
 
 extern "C" IDirect3D9 *WINAPI Direct3DCreate9(UINT SDKVersion)
 {
+    LogLine("Direct3DCreate9 called");
     EnsureRealLoaded();
     HookDeviceVTable();
     return pRealCreate9 ? pRealCreate9(SDKVersion) : nullptr;
@@ -181,6 +200,7 @@ extern "C" IDirect3D9 *WINAPI Direct3DCreate9(UINT SDKVersion)
 
 extern "C" HRESULT WINAPI Direct3DCreate9Ex(UINT SDKVersion, IDirect3D9Ex **ppD3D)
 {
+    LogLine("Direct3DCreate9Ex called");
     EnsureRealLoaded();
     HookDeviceVTable();
     return pRealCreate9Ex ? pRealCreate9Ex(SDKVersion, ppD3D) : E_NOTIMPL;
@@ -192,11 +212,24 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID)
 {
     if (reason == DLL_PROCESS_ATTACH)
     {
+        LogLine("DllMain attach");
         DisableThreadLibraryCalls(hModule);
+
+        // WoW 3.3.5a probes Direct3D9 with a load / Direct3DCreate9 / FreeLibrary
+        // cycle *before* it renders for real. If we let that FreeLibrary unload
+        // us, DLL_PROCESS_DETACH runs MH_DisableHook and tears the EndScene hook
+        // back down, so the overlay never draws. Pin our own module so
+        // FreeLibrary can never unload us; the hook then lives until process exit
+        // and catches the game's real EndScene calls.
+        HMODULE pin = nullptr;
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_PIN | GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+                           reinterpret_cast<LPCWSTR>(&DllMain), &pin);
+
         EnsureRealLoaded();
     }
     else if (reason == DLL_PROCESS_DETACH)
     {
+        LogLine("DllMain detach");
         if (gVTableHooked)
         {
             MH_DisableHook(MH_ALL_HOOKS);

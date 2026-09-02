@@ -38,6 +38,15 @@ target_include_directories(d3d9 PRIVATE
     ${MINHOOK}/include
 )
 
+# Debug instrumentation: writes C:\Users\Michael\d3d9proxy.log from DllMain,
+# the Direct3DCreate9(Ex) overrides, CreateDevice HRESULT and the hooks.
+# Off by default so the shipped d3d9.dll is quiet; turn on with -DPROXY_DEBUG=ON
+# to diagnose the overlay again.
+option(PROXY_DEBUG "Enable file logging to diagnose the overlay" OFF)
+if(PROXY_DEBUG)
+    target_compile_definitions(d3d9 PRIVATE PROXY_DEBUG)
+endif()
+
 set_target_properties(d3d9 PROPERTIES
     OUTPUT_NAME "d3d9"   # produces d3d9.dll
     PREFIX "")
