@@ -1,5 +1,10 @@
 # Dll Proxy Generator
 
+<!-- links:start -->
+[![Support me on Ko-fi](https://malura.de/assets/badge/kofi.svg)](https://malura.de/go/kofi?ref=dll-proxy-generator)
+[![Check out my page](https://malura.de/assets/badge/malura.svg)](https://malura.de/go/site?ref=dll-proxy-generator)
+<!-- links:end -->
+
 This project creates a new dll which sits between a game and the original dll. This way you can intercept all dll calls.
 
 Game -> Your proxy dll -> Original dll
