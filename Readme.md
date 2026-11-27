@@ -48,5 +48,5 @@ cmake --build build --config Release
 Copy the built proxy DLL into the game directory. The Windows DLL search order
 loads the application directory before system32, so the proxy wins.
 
-See `HANDOVER.md` for two worked ImGui-overlay examples (WoW 3.3.5a via d3d9,
-WRATH via SDL2).
+`imgui_proxy/` is a worked example: a d3d9 proxy for an x86 game that overrides
+`Direct3DCreate9`, hooks `EndScene` and draws a Dear ImGui overlay.
